@@ -9,10 +9,10 @@ function parseBookingTime(timeStr: string, dateStr: string): Date {
     const [hoursStr, minutesStr] = timeStr.split(':');
     const hours = parseInt(hoursStr, 10);
     const minutes = parseInt(minutesStr, 10);
-    
+
     // Split date into year, month, day
     const [year, month, day] = dateStr.split('-').map(num => parseInt(num, 10));
-    
+
     // Create the date object
     const date = new Date();
     date.setFullYear(year);
@@ -22,7 +22,7 @@ function parseBookingTime(timeStr: string, dateStr: string): Date {
     date.setMinutes(minutes);
     date.setSeconds(0);
     date.setMilliseconds(0);
-    
+
     return date;
   } catch (error) {
     addLog("ERROR", `Failed to parse time: ${timeStr} on date ${dateStr}: ${(error as Error).message}`);
@@ -40,23 +40,23 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
   try {
     // Fetch bookings from Supabase, passing any requested date
     const supabaseBookings = await fetchBookings(requestDate);
-    
+
     addLog("INFO", `Processing ${supabaseBookings.length} bookings from Supabase`);
-    
+
     // Sort bookings by start time
     supabaseBookings.sort((a, b) => {
       const timeA = a.start_time.split(':').map(Number);
       const timeB = b.start_time.split(':').map(Number);
-      
+
       // Compare hours
       if (timeA[0] !== timeB[0]) {
         return timeA[0] - timeB[0];
       }
-      
+
       // If hours are the same, compare minutes
       return timeA[1] - timeB[1];
     });
-    
+
     // Get current time in NZ timezone in a reliable way
     const nzTimeString = new Date().toLocaleString("en-NZ", { 
       timeZone: "Pacific/Auckland",
@@ -64,44 +64,44 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
       minute: "2-digit",
       hour12: false
     });
-    
+
     // Parse hours and minutes from the time string (format should be HH:MM)
     const timeParts = nzTimeString.split(":");
     const nowHours = parseInt(timeParts[0], 10);
     const nowMinutes = parseInt(timeParts[1], 10);
-    
+
     addLog("INFO", `Current time in NZ: ${nowHours}:${nowMinutes.toString().padStart(2, '0')}`);
-    
+
     // Process bookings to determine status
     const processedBookings: Booking[] = [];
     let foundNowOrUpcoming = false;
     let firstStatusIsNow = false;
-    
+
     // First pass - identify "now" or "upcoming"
     for (const booking of supabaseBookings) {
       try {
         // Get start and end times as hours and minutes
         const [startHoursStr, startMinutesStr] = booking.start_time.split(':');
         const [endHoursStr, endMinutesStr] = booking.end_time.split(':');
-        
+
         const startHours = parseInt(startHoursStr, 10);
         const startMinutes = parseInt(startMinutesStr, 10);
         const endHours = parseInt(endHoursStr, 10);
         const endMinutes = parseInt(endMinutesStr, 10);
-        
+
         // Convert to total minutes for easier comparison
         const startTotalMinutes = startHours * 60 + startMinutes;
         const endTotalMinutes = endHours * 60 + endMinutes;
         const nowTotalMinutes = nowHours * 60 + nowMinutes;
-        
+
         addLog("INFO", `Processing booking: ${booking.uid}, Start: ${startHours}:${startMinutes}, End: ${endHours}:${endMinutes}, Now: ${nowHours}:${nowMinutes}`);
-        
+
         // Skip past bookings
         if (endTotalMinutes < nowTotalMinutes) {
           addLog("INFO", `Skipping past booking: ${booking.uid}`);
           continue;
         }
-        
+
         if (!foundNowOrUpcoming) {
           if (startTotalMinutes <= nowTotalMinutes && endTotalMinutes > nowTotalMinutes) {
             // Current booking
@@ -118,6 +118,21 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
             foundNowOrUpcoming = true;
             firstStatusIsNow = true;
           } else if (startTotalMinutes > nowTotalMinutes) {
+            // If no current booking, add "Room available" slot
+            if (!firstStatusIsNow) {
+              const currentHourStr = nowHours.toString().padStart(2, '0');
+              const endTimeStr = booking.start_time;
+              processedBookings.push({
+                id: 'available-now',
+                name: 'Room available',
+                creator: '',
+                start_time: `${currentHourStr}:00`,
+                end_time: endTimeStr,
+                status: "now",
+                timeRange: `${currentHourStr}:00 - ${endTimeStr}`
+              });
+              firstStatusIsNow = true;
+            }
             // Next upcoming booking
             addLog("INFO", `Found UPCOMING booking: ${booking.uid}`);
             processedBookings.push({
@@ -136,40 +151,40 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
         addLog("ERROR", `Error processing booking: ${(error as Error).message}`);
       }
     }
-    
+
     // Second pass - identify "next"/"then" and "later"
     let foundNextOrThen = false;
-    
+
     for (const booking of supabaseBookings) {
       try {
         // Skip bookings we've already processed
         if (processedBookings.some(b => b.id === booking.uid)) {
           continue;
         }
-        
+
         // Get start and end times as hours and minutes
         const [startHoursStr, startMinutesStr] = booking.start_time.split(':');
         const [endHoursStr, endMinutesStr] = booking.end_time.split(':');
-        
+
         const startHours = parseInt(startHoursStr, 10);
         const startMinutes = parseInt(startMinutesStr, 10);
         const endHours = parseInt(endHoursStr, 10);
         const endMinutes = parseInt(endMinutesStr, 10);
-        
+
         // Convert to total minutes for easier comparison
         const endTotalMinutes = endHours * 60 + endMinutes;
         const nowTotalMinutes = nowHours * 60 + nowMinutes;
-        
+
         // Skip past bookings
         if (endTotalMinutes < nowTotalMinutes) {
           continue;
         }
-        
+
         if (!foundNextOrThen && foundNowOrUpcoming) {
           // First booking after the now/upcoming one
           const status = firstStatusIsNow ? "next" : "then";
           addLog("INFO", `Found ${status.toUpperCase()} booking: ${booking.uid}`);
-          
+
           processedBookings.push({
             id: booking.uid,
             name: booking.name,
@@ -183,7 +198,7 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
         } else {
           // Any remaining future bookings
           addLog("INFO", `Found LATER booking: ${booking.uid}`);
-          
+
           processedBookings.push({
             id: booking.uid,
             name: booking.name,
@@ -198,10 +213,10 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
         addLog("ERROR", `Error in second pass: ${(error as Error).message}`);
       }
     }
-    
+
     // Log the results
     addLog("INFO", `Total processed bookings: ${processedBookings.length}`);
-    
+
     const statusCounts = {
       now: processedBookings.filter(b => b.status === "now").length,
       upcoming: processedBookings.filter(b => b.status === "upcoming").length,
@@ -209,15 +224,15 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
       then: processedBookings.filter(b => b.status === "then").length,
       later: processedBookings.filter(b => b.status === "later").length,
     };
-    
+
     const statusString = Object.entries(statusCounts)
       .filter(([_, count]) => count > 0)
       .map(([status, count]) => `${count} ${status.toUpperCase()}`)
       .join(", ");
-    
+
     addLog("INFO", `Status assignment complete: ${statusString}`);
     addLog("INFO", "Ready to serve API requests");
-    
+
     // Return the processed bookings with API status and logs
     return {
       bookings: processedBookings,
@@ -226,7 +241,7 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
     };
   } catch (error) {
     addLog("ERROR", `Error in fetchAndProcessBookings: ${(error as Error).message}`);
-    
+
     // Return empty data with error status
     return {
       bookings: [],
