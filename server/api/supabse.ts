@@ -44,7 +44,7 @@ export function getLogs(): Log[] {
 
 // Get Supabase URL and API key from environment variables
 import { config } from "../config";
-import { url } from "inspector";
+//import { url } from "inspector";
 
 const getSupabaseConfig = () => {
   return {
@@ -53,7 +53,7 @@ const getSupabaseConfig = () => {
     email: config.supabase.email,
     password: config.supabase.password,
   };
-  
+
 };
 
 // Authenticate with Supabase and get a token
