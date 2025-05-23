@@ -71,7 +71,7 @@ import { config } from './config';
       host: config.host,
       reusePort: true,
     }, () => {
-      const startupMessage = `API server running on port ${port}`;
+      const startupMessage = `API server running on port ${config.port}`;
       console.log(startupMessage);
       addLog("INFO", startupMessage);
     });
