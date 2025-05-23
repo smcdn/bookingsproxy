@@ -41,32 +41,12 @@ app.use((req, res, next) => {
 
 import { config } from './config';
 
-// Check if required environment variables are set
-const checkRequiredEnvVars = () => {
-  const missing = config.required_env_vars.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    console.error(`ERROR: Missing required environment variables: ${missing.join(', ')}`);
-    addLog("ERROR", `Missing required environment variables: ${missing.join(', ')}`);
-    return false;
-  }
-  
-  return true;
-};
-
 (async () => {
   // Start the server
   try {
     // Log server startup
     console.log("Starting Small Tutorial Room Booking API server...");
     addLog("INFO", "Starting Small Tutorial Room Booking API server");
-    
-    // Check environment variables
-    if (!checkRequiredEnvVars()) {
-      console.error("Server startup aborted due to missing environment variables");
-      addLog("ERROR", "Server startup aborted due to missing environment variables");
-      return;
-    }
     
     // Register routes
     const server = await registerRoutes(app);
