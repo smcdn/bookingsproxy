@@ -214,6 +214,31 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
       }
     }
 
+    // Add room available slot after last booking until 23:00 if there's a gap
+    const lastBooking = processedBookings[processedBookings.length - 1];
+    if (lastBooking && lastBooking.end_time !== "23:00") {
+      processedBookings.push({
+        id: 'available-later',
+        name: 'Room available',
+        creator: '',
+        start_time: lastBooking.end_time,
+        end_time: "23:00",
+        status: "later",
+        timeRange: `${lastBooking.end_time} - 23:00`
+      });
+    }
+
+    // Add room closed slot from 23:00 to 07:00
+    processedBookings.push({
+      id: 'closed',
+      name: 'Room closed',
+      creator: '',
+      start_time: "23:00",
+      end_time: "07:00",
+      status: "later",
+      timeRange: "23:00 - 07:00"
+    });
+
     // Log the results
     addLog("INFO", `Total processed bookings: ${processedBookings.length}`);
 
