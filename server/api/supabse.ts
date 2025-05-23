@@ -40,22 +40,14 @@ export function getLogs(): Log[] {
 }
 
 // Get Supabase URL and API key from environment variables
+import { config } from '../config';
+
 const getSupabaseConfig = () => {
-  const supabaseUrl = process.env.SUPABASE_URL || "https://atjmvjmbygrkwxchfxzl.supabase.co";
-  const supabaseKey = process.env.SUPABASE_KEY;
-  const supabaseEmail = process.env.SUPABASE_EMAIL;
-  const supabasePassword = process.env.SUPABASE_PASSWORD;
-  
-  if (!supabaseKey || !supabaseEmail || !supabasePassword) {
-    addLog("ERROR", "Missing Supabase configuration. Please set SUPABASE_KEY, SUPABASE_EMAIL, and SUPABASE_PASSWORD environment variables.");
-    throw new Error("Missing Supabase configuration. Please set SUPABASE_KEY, SUPABASE_EMAIL, and SUPABASE_PASSWORD environment variables.");
-  }
-  
   return {
-    url: supabaseUrl,
-    key: supabaseKey,
-    email: supabaseEmail,
-    password: supabasePassword,
+    url: config.supabase.url,
+    key: config.supabase.key,
+    email: config.supabase.email,
+    password: config.supabase.password,
   };
 };
 
