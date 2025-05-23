@@ -39,10 +39,11 @@ app.use((req, res, next) => {
   next();
 });
 
+import { config } from './config';
+
 // Check if required environment variables are set
 const checkRequiredEnvVars = () => {
-  const required = ['SUPABASE_KEY', 'SUPABASE_EMAIL', 'SUPABASE_PASSWORD'];
-  const missing = required.filter(key => !process.env[key]);
+  const missing = config.required_env_vars.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
     console.error(`ERROR: Missing required environment variables: ${missing.join(', ')}`);
@@ -84,11 +85,10 @@ const checkRequiredEnvVars = () => {
       res.send("Small Tutorial Room Booking API Server is running");
     });
 
-    // ALWAYS serve the app on port 5000
-    const port = 5000;
+    // Use port and host from config
     server.listen({
-      port,
-      host: "0.0.0.0",
+      port: config.port,
+      host: config.host,
       reusePort: true,
     }, () => {
       const startupMessage = `API server running on port ${port}`;
