@@ -1,4 +1,10 @@
-import { users, type User, type InsertUser } from "@shared/schema";
+interface User {
+  id: number;
+  username: string;
+  password: string;
+}
+
+type InsertUser = Omit<User, "id">;
 
 // modify the interface with any CRUD methods
 // you might need
