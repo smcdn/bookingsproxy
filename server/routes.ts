@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { fetchAndProcessBookings } from "./api/bookings";
-import { addLog } from "./api/supabse";
+import { addLog } from "./api/supabase";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Main API route to get bookings

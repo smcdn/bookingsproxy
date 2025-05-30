@@ -1,7 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { log } from "./vite";
-import { addLog } from "./api/supabse";
+import { addLog } from "./api/supabase";
+
+// Logging utility function moved from vite.ts
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 // Create Express app
 const app = express();
@@ -51,6 +61,15 @@ import { config } from './config';
     // Register routes
     const server = await registerRoutes(app);
 
+    // API key middleware
+    app.use((req, res, next) => {
+      const apiKey = req.headers['x-api-key'];
+      if (!apiKey || apiKey !== config.apiKey) {
+        return res.status(401).json({ message: 'Invalid or missing API key' });
+      }
+      next();
+    });
+
     // Error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
@@ -66,11 +85,7 @@ import { config } from './config';
     });
 
     // Use port and host from config
-    server.listen({
-      port: config.port,
-      host: config.host,
-      reusePort: true,
-    }, () => {
+    server.listen(config.port, config.host, () => {
       const startupMessage = `API server running on port ${config.port}`;
       console.log(startupMessage);
       addLog("INFO", startupMessage);

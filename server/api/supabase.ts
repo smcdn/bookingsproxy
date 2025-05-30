@@ -228,39 +228,25 @@ export async function fetchBookings(
 
     addLog("INFO", `Received ${response.data.length} bookings for today`);
 
-    // If no data returned, add sample data for testing
+    // If no data returned, show available slot from now to 23:00
     if (!response.data || response.data.length === 0) {
-      // Create two sample bookings
+      const now = new Date();
+      const currentHour = now.getHours();
       const today = queryDate;
-      const currentHour = new Date().getHours();
-
-      // Create some sample bookings for testing
-      const sampleBookings = [
-        {
-          uid: "sample-booking-1",
-          name: "Morning Meeting",
-          creator: "System Test",
-          date: today,
-          start_time: `${String(currentHour - 1).padStart(2, "0")}:00`,
-          end_time: `${String(currentHour + 1).padStart(2, "0")}:00`,
-          room: "Small Tutorial Room",
-        },
-        {
-          uid: "sample-booking-2",
-          name: "Afternoon Session",
-          creator: "System Test",
-          date: today,
-          start_time: `${String(currentHour + 2).padStart(2, "0")}:00`,
-          end_time: `${String(currentHour + 3).padStart(2, "0")}:00`,
-          room: "Small Tutorial Room",
-        },
-      ];
-
+      const availableBooking = [{
+        uid: "available-slot",
+        name: "Available",
+        creator: "System",
+        date: today,
+        start_time: `${String(currentHour).padStart(2, "0")}:00`,
+        end_time: "23:00",
+        room: "Small Tutorial Room",
+      }];
       addLog(
         "INFO",
-        `No bookings found for today, adding 2 sample bookings for testing`,
+        `No bookings found for today, showing available slot from ${String(currentHour).padStart(2, "0")}:00 to 23:00`,
       );
-      return sampleBookings;
+      return availableBooking;
     }
 
     // Normalize the response to ensure all required fields are present

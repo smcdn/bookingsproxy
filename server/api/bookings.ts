@@ -1,5 +1,5 @@
-import { Booking, BookingData, SupabaseBooking } from "@/lib/types";
-import { fetchBookings, getApiStatus, getLogs, addLog } from "./supabse";
+//import { Booking, BookingData, SupabaseBooking } from "@/lib/types";
+import { fetchBookings, getApiStatus, getLogs, addLog } from "./supabase";
 
 // Parse the Supabase time format (HH:MM) and return a full date object
 // combining the date from the booking with the time
@@ -73,9 +73,9 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
     addLog("INFO", `Current time in NZ: ${nowHours}:${nowMinutes.toString().padStart(2, '0')}`);
 
     // Process bookings to determine status
-    const processedBookings: Booking[] = [];
+    const processedBookings: any[] = [];
     let foundNowOrUpcoming = false;
-    let firstStatusIsNow = false;
+    let firstTimePeriodIsNow = false;
 
     // First pass - identify "now" or "upcoming"
     for (const booking of supabaseBookings) {
@@ -104,44 +104,43 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
 
         if (!foundNowOrUpcoming) {
           if (startTotalMinutes <= nowTotalMinutes && endTotalMinutes > nowTotalMinutes) {
-            // Current booking
-            addLog("INFO", `Found NOW booking: ${booking.uid}`);
+            // Current booking (should be available if it's the special available slot)
+            const isAvailableSlot = booking.name === "Available" && booking.creator === "System";
+            addLog("INFO", `Found NOW booking: ${booking.uid || 'available-slot'}`);
             processedBookings.push({
-              id: booking.uid,
               name: booking.name,
               creator: booking.creator,
               start_time: booking.start_time,
               end_time: booking.end_time,
-              status: "now",
+              status: isAvailableSlot ? "available" : "booked",
+              timePeriod: "now",
               timeRange: `${booking.start_time} - ${booking.end_time}`
             });
             foundNowOrUpcoming = true;
-            firstStatusIsNow = true;
+            firstTimePeriodIsNow = true;
           } else if (startTotalMinutes > nowTotalMinutes) {
-            // If no current booking, add "Room available" slot
-            if (!firstStatusIsNow) {
+            // If no current booking, add available slot
+            if (!firstTimePeriodIsNow) {
               const currentHourStr = nowHours.toString().padStart(2, '0');
               const endTimeStr = booking.start_time;
               processedBookings.push({
-                id: 'available-now',
-                name: 'Room available',
-                creator: '',
                 start_time: `${currentHourStr}:00`,
                 end_time: endTimeStr,
-                status: "now",
+                status: "available",
+                timePeriod: "now",
                 timeRange: `${currentHourStr}:00 - ${endTimeStr}`
               });
-              firstStatusIsNow = true;
+              firstTimePeriodIsNow = true;
             }
-            // Next upcoming booking
+            // Next upcoming booking (booked)
             addLog("INFO", `Found UPCOMING booking: ${booking.uid}`);
             processedBookings.push({
-              id: booking.uid,
               name: booking.name,
               creator: booking.creator,
               start_time: booking.start_time,
               end_time: booking.end_time,
-              status: "upcoming",
+              status: "booked",
+              timePeriod: "upcoming",
               timeRange: `${booking.start_time} - ${booking.end_time}`
             });
             foundNowOrUpcoming = true;
@@ -152,90 +151,58 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
       }
     }
 
-    // Second pass - identify "next"/"then" and "later"
-    let foundNextOrThen = false;
-
+    // Second pass - assign all remaining as 'later'
     for (const booking of supabaseBookings) {
       try {
         // Skip bookings we've already processed
-        if (processedBookings.some(b => b.id === booking.uid)) {
+        if (processedBookings.some(b => b.start_time === booking.start_time && b.end_time === booking.end_time)) {
           continue;
         }
-
         // Get start and end times as hours and minutes
         const [startHoursStr, startMinutesStr] = booking.start_time.split(':');
         const [endHoursStr, endMinutesStr] = booking.end_time.split(':');
-
-        const startHours = parseInt(startHoursStr, 10);
-        const startMinutes = parseInt(startMinutesStr, 10);
         const endHours = parseInt(endHoursStr, 10);
         const endMinutes = parseInt(endMinutesStr, 10);
-
-        // Convert to total minutes for easier comparison
-        const endTotalMinutes = endHours * 60 + endMinutes;
         const nowTotalMinutes = nowHours * 60 + nowMinutes;
-
+        const endTotalMinutes = endHours * 60 + endMinutes;
         // Skip past bookings
         if (endTotalMinutes < nowTotalMinutes) {
           continue;
         }
-
-        if (!foundNextOrThen && foundNowOrUpcoming) {
-          // First booking after the now/upcoming one
-          const status = firstStatusIsNow ? "next" : "then";
-          addLog("INFO", `Found ${status.toUpperCase()} booking: ${booking.uid}`);
-
-          processedBookings.push({
-            id: booking.uid,
-            name: booking.name,
-            creator: booking.creator,
-            start_time: booking.start_time,
-            end_time: booking.end_time,
-            status: status as "next" | "then",
-            timeRange: `${booking.start_time} - ${booking.end_time}`
-          });
-          foundNextOrThen = true;
-        } else {
-          // Any remaining future bookings
-          addLog("INFO", `Found LATER booking: ${booking.uid}`);
-
-          processedBookings.push({
-            id: booking.uid,
-            name: booking.name,
-            creator: booking.creator,
-            start_time: booking.start_time,
-            end_time: booking.end_time,
-            status: "later",
-            timeRange: `${booking.start_time} - ${booking.end_time}`
-          });
-        }
+        // Any remaining future bookings (booked)
+        addLog("INFO", `Found LATER booking: ${booking.uid}`);
+        processedBookings.push({
+          name: booking.name,
+          creator: booking.creator,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          status: "booked",
+          timePeriod: "later",
+          timeRange: `${booking.start_time} - ${booking.end_time}`
+        });
       } catch (error) {
         addLog("ERROR", `Error in second pass: ${(error as Error).message}`);
       }
     }
 
-    // Add room available slot after last booking until 23:00 if there's a gap
+    // Add available slot after last booking until 23:00 if there's a gap
     const lastBooking = processedBookings[processedBookings.length - 1];
     if (lastBooking && lastBooking.end_time !== "23:00") {
       processedBookings.push({
-        id: 'available-later',
-        name: 'Room available',
-        creator: '',
         start_time: lastBooking.end_time,
         end_time: "23:00",
-        status: "later",
+        status: "available",
+        timePeriod: "later",
         timeRange: `${lastBooking.end_time} - 23:00`
       });
     }
 
-    // Add room closed slot from 23:00 to 07:00
+    // Add closed slot from 23:00 to 07:00
     processedBookings.push({
-      id: 'closed',
-      name: 'Room closed',
-      creator: '',
       start_time: "23:00",
       end_time: "07:00",
-      status: "later",
+      status: "closed",
+      timePeriod: "later",
       timeRange: "23:00 - 07:00"
     });
 
