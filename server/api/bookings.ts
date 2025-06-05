@@ -1,5 +1,6 @@
 //import { Booking, BookingData, SupabaseBooking } from "@/lib/types";
 import { fetchBookings, getApiStatus, getLogs, addLog } from "./supabase";
+import { BookingData } from "../lib/types";
 
 // Parse the Supabase time format (HH:MM) and return a full date object
 // combining the date from the booking with the time
@@ -35,6 +36,16 @@ function formatTimeForDisplay(timeStr: string): string {
   return timeStr; // The Supabase data already comes in HH:MM format, so we can use it directly
 }
 
+// Helper to round time to the nearest quarter hour
+function roundToQuarterHour(hours: number, minutes: number) {
+  const roundedMinutes = Math.floor(minutes / 15) * 15;
+  return {
+    hours,
+    minutes: roundedMinutes,
+    timeStr: `${hours.toString().padStart(2, '0')}:${roundedMinutes.toString().padStart(2, '0')}`
+  };
+}
+
 // Determine the status of each booking
 export async function fetchAndProcessBookings(requestDate?: string): Promise<BookingData> {
   try {
@@ -64,136 +75,91 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
       minute: "2-digit",
       hour12: false
     });
-
-    // Parse hours and minutes from the time string (format should be HH:MM)
     const timeParts = nzTimeString.split(":");
     const nowHours = parseInt(timeParts[0], 10);
     const nowMinutes = parseInt(timeParts[1], 10);
-
+    const nowTotalMinutes = nowHours * 60 + nowMinutes;
     addLog("INFO", `Current time in NZ: ${nowHours}:${nowMinutes.toString().padStart(2, '0')}`);
 
-    // Process bookings to determine status
+    // Only keep bookings that end after the current (rounded) time
+    const roundedNow = roundToQuarterHour(nowHours, nowMinutes);
+    const roundedNowMinutes = roundedNow.hours * 60 + roundedNow.minutes;
+    const futureBookings = supabaseBookings.filter(booking => {
+      const [endHours, endMinutes] = booking.end_time.split(":").map(Number);
+      const bookingEndMinutes = endHours * 60 + endMinutes;
+      return bookingEndMinutes > roundedNowMinutes;
+    });
+
     const processedBookings: any[] = [];
-    let foundNowOrUpcoming = false;
-    let firstTimePeriodIsNow = false;
+    let lastEndMinutes = roundedNowMinutes;
+    let lastEndTime = roundedNow.timeStr;
+    let timePeriod: "now" | "upcoming" | "later" = "now";
+    let isFirstSlot = true;
 
-    // First pass - identify "now" or "upcoming"
-    for (const booking of supabaseBookings) {
-      try {
-        // Get start and end times as hours and minutes
-        const [startHoursStr, startMinutesStr] = booking.start_time.split(':');
-        const [endHoursStr, endMinutesStr] = booking.end_time.split(':');
+    for (const booking of futureBookings) {
+      const [startHours, startMinutes] = booking.start_time.split(":").map(Number);
+      const [endHours, endMinutes] = booking.end_time.split(":").map(Number);
+      const bookingStartMinutes = startHours * 60 + startMinutes;
+      const bookingEndMinutes = endHours * 60 + endMinutes;
 
-        const startHours = parseInt(startHoursStr, 10);
-        const startMinutes = parseInt(startMinutesStr, 10);
-        const endHours = parseInt(endHoursStr, 10);
-        const endMinutes = parseInt(endMinutesStr, 10);
-
-        // Convert to total minutes for easier comparison
-        const startTotalMinutes = startHours * 60 + startMinutes;
-        const endTotalMinutes = endHours * 60 + endMinutes;
-        const nowTotalMinutes = nowHours * 60 + nowMinutes;
-
-        addLog("INFO", `Processing booking: ${booking.uid}, Start: ${startHours}:${startMinutes}, End: ${endHours}:${endMinutes}, Now: ${nowHours}:${nowMinutes}`);
-
-        // Skip past bookings
-        if (endTotalMinutes < nowTotalMinutes) {
-          addLog("INFO", `Skipping past booking: ${booking.uid}`);
-          continue;
+      // Insert available slot if there's a gap
+      if (bookingStartMinutes > lastEndMinutes) {
+        // Determine timePeriod for available slot
+        if (isFirstSlot) {
+          timePeriod = "now";
+        } else if (timePeriod === "now") {
+          timePeriod = "upcoming";
+        } else {
+          timePeriod = "later";
         }
-
-        if (!foundNowOrUpcoming) {
-          if (startTotalMinutes <= nowTotalMinutes && endTotalMinutes > nowTotalMinutes) {
-            // Current booking (should be available if it's the special available slot)
-            const isAvailableSlot = booking.name === "Available" && booking.creator === "System";
-            addLog("INFO", `Found NOW booking: ${booking.uid || 'available-slot'}`);
-            processedBookings.push({
-              name: booking.name,
-              creator: booking.creator,
-              start_time: booking.start_time,
-              end_time: booking.end_time,
-              status: isAvailableSlot ? "available" : "booked",
-              timePeriod: "now",
-              timeRange: `${booking.start_time} - ${booking.end_time}`
-            });
-            foundNowOrUpcoming = true;
-            firstTimePeriodIsNow = true;
-          } else if (startTotalMinutes > nowTotalMinutes) {
-            // If no current booking, add available slot
-            if (!firstTimePeriodIsNow) {
-              const currentHourStr = nowHours.toString().padStart(2, '0');
-              const endTimeStr = booking.start_time;
-              processedBookings.push({
-                start_time: `${currentHourStr}:00`,
-                end_time: endTimeStr,
-                status: "available",
-                timePeriod: "now",
-                timeRange: `${currentHourStr}:00 - ${endTimeStr}`
-              });
-              firstTimePeriodIsNow = true;
-            }
-            // Next upcoming booking (booked)
-            addLog("INFO", `Found UPCOMING booking: ${booking.uid}`);
-            processedBookings.push({
-              name: booking.name,
-              creator: booking.creator,
-              start_time: booking.start_time,
-              end_time: booking.end_time,
-              status: "booked",
-              timePeriod: "upcoming",
-              timeRange: `${booking.start_time} - ${booking.end_time}`
-            });
-            foundNowOrUpcoming = true;
-          }
-        }
-      } catch (error) {
-        addLog("ERROR", `Error processing booking: ${(error as Error).message}`);
-      }
-    }
-
-    // Second pass - assign all remaining as 'later'
-    for (const booking of supabaseBookings) {
-      try {
-        // Skip bookings we've already processed
-        if (processedBookings.some(b => b.start_time === booking.start_time && b.end_time === booking.end_time)) {
-          continue;
-        }
-        // Get start and end times as hours and minutes
-        const [startHoursStr, startMinutesStr] = booking.start_time.split(':');
-        const [endHoursStr, endMinutesStr] = booking.end_time.split(':');
-        const endHours = parseInt(endHoursStr, 10);
-        const endMinutes = parseInt(endMinutesStr, 10);
-        const nowTotalMinutes = nowHours * 60 + nowMinutes;
-        const endTotalMinutes = endHours * 60 + endMinutes;
-        // Skip past bookings
-        if (endTotalMinutes < nowTotalMinutes) {
-          continue;
-        }
-        // Any remaining future bookings (booked)
-        addLog("INFO", `Found LATER booking: ${booking.uid}`);
         processedBookings.push({
-          name: booking.name,
-          creator: booking.creator,
-          start_time: booking.start_time,
-          end_time: booking.end_time,
-          status: "booked",
-          timePeriod: "later",
-          timeRange: `${booking.start_time} - ${booking.end_time}`
+          start_time: lastEndTime,
+          end_time: booking.start_time,
+          status: "available",
+          timePeriod,
+          timeRange: `${lastEndTime} - ${booking.start_time}`
         });
-      } catch (error) {
-        addLog("ERROR", `Error in second pass: ${(error as Error).message}`);
+        isFirstSlot = false;
       }
+
+      // Determine timePeriod for booking
+      if (isFirstSlot) {
+        timePeriod = "now";
+      } else if (timePeriod === "now") {
+        timePeriod = "upcoming";
+      } else {
+        timePeriod = "later";
+      }
+      processedBookings.push({
+        name: booking.name,
+        creator: booking.creator,
+        start_time: booking.start_time,
+        end_time: booking.end_time,
+        status: "booked",
+        timePeriod,
+        timeRange: `${booking.start_time} - ${booking.end_time}`
+      });
+      lastEndMinutes = bookingEndMinutes;
+      lastEndTime = booking.end_time;
+      isFirstSlot = false;
     }
 
-    // Add available slot after last booking until 23:00 if there's a gap
-    const lastBooking = processedBookings[processedBookings.length - 1];
-    if (lastBooking && lastBooking.end_time !== "23:00") {
+    // After last booking, if before 23:00, insert available slot
+    if (lastEndTime !== "23:00") {
+      // Determine timePeriod for final available slot
+      if (isFirstSlot) {
+        timePeriod = "now";
+      } else if (timePeriod === "now") {
+        timePeriod = "upcoming";
+      } else {
+        timePeriod = "later";
+      }
       processedBookings.push({
-        start_time: lastBooking.end_time,
+        start_time: lastEndTime,
         end_time: "23:00",
         status: "available",
-        timePeriod: "later",
-        timeRange: `${lastBooking.end_time} - 23:00`
+        timePeriod,
+        timeRange: `${lastEndTime} - 23:00`
       });
     }
 

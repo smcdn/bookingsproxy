@@ -1,5 +1,5 @@
 import axios from "axios";
-import { SupabaseAuthResponse, SupabaseBooking, Log } from "@/lib/types";
+import { SupabaseAuthResponse, SupabaseBooking, Log } from "../lib/types";
 
 // Cache for the supabase token
 let tokenCache: {
