@@ -18,6 +18,20 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// API key middleware (must be before routes)
+app.use((req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey) {
+    addLog("ERROR", "Missing required header: x-api-key");
+    return res.status(401).json({ message: 'Missing required header: x-api-key' });
+  }
+  if (apiKey !== config.apiKey) {
+    addLog("WARN", `Invalid API key attempt: ${apiKey}`);
+    return res.status(401).json({ message: 'Invalid API key' });
+  }
+  next();
+});
+
 // Logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
@@ -55,20 +69,11 @@ import { config } from './config';
   // Start the server
   try {
     // Log server startup
-    console.log("Starting Small Tutorial Room Booking API server...");
-    addLog("INFO", "Starting Small Tutorial Room Booking API server");
+    console.log("Starting Room Bookings API Server...");
+    addLog("INFO", "Starting Room Bookings API Server");
     
     // Register routes
     const server = await registerRoutes(app);
-
-    // API key middleware
-    app.use((req, res, next) => {
-      const apiKey = req.headers['x-api-key'];
-      if (!apiKey || apiKey !== config.apiKey) {
-        return res.status(401).json({ message: 'Invalid or missing API key' });
-      }
-      next();
-    });
 
     // Error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -81,12 +86,12 @@ import { config } from './config';
 
     // Simple route for the root URL
     app.get("/", (_req, res) => {
-      res.send("Small Tutorial Room Booking API Server is running");
+      res.send("Room Bookings API Server is running");
     });
 
     // Use port and host from config
     server.listen(config.port, config.host, () => {
-      const startupMessage = `API server running on port ${config.port}`;
+      const startupMessage = `Room Bookings API Server running on port ${config.port}`;
       console.log(startupMessage);
       addLog("INFO", startupMessage);
     });

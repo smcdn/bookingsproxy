@@ -1,5 +1,10 @@
 import axios from "axios";
 import { SupabaseAuthResponse, SupabaseBooking, Log } from "../lib/types";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Cache for the supabase token
 let tokenCache: {
@@ -16,11 +21,12 @@ export function addLog(
   message: string,
 ): void {
   const now = new Date();
+  const date = now.toISOString().slice(0, 10); // YYYY-MM-DD
   const hours = now.getHours().toString().padStart(2, "0");
   const minutes = now.getMinutes().toString().padStart(2, "0");
   const seconds = now.getSeconds().toString().padStart(2, "0");
 
-  const timestamp = `${hours}:${minutes}:${seconds}`;
+  const timestamp = `${date} ${hours}:${minutes}:${seconds}`;
 
   logs.push({
     timestamp,
@@ -175,11 +181,32 @@ function formatDateForQuery(date: Date): string {
   }
 }
 
+// Use absolute path for rooms.json
+const roomsPath = path.resolve(__dirname, "../../rooms.json");
+let roomsData: { rooms: { id: number; name: string }[] };
+try {
+  roomsData = JSON.parse(fs.readFileSync(roomsPath, "utf-8"));
+} catch (e) {
+  addLog("ERROR", `Failed to load rooms.json: ${(e as Error).message}`);
+  roomsData = { rooms: [] };
+}
+const validRoomNames = roomsData.rooms.map((room: any) => room.name);
+
 // Fetch bookings from Supabase
 export async function fetchBookings(
   requestDate?: string,
-): Promise<SupabaseBooking[]> {
+  roomName?: string
+): Promise<{ room: { name: string; id: number }; bookings: SupabaseBooking[] }> {
   try {
+    if (!roomName) {
+      addLog("ERROR", "Missing required header: room_name");
+      throw new Error("Missing required header: room_name");
+    }
+    const roomObj = roomsData.rooms.find((room: any) => room.name === roomName);
+    if (!roomObj) {
+      addLog("WARN", `Invalid room_name requested: ${roomName}`);
+      throw new Error(`Invalid room_name: ${roomName}`);
+    }
     const { url, key } = getSupabaseConfig();
     const token = await getSupabaseToken();
 
@@ -206,10 +233,10 @@ export async function fetchBookings(
       addLog("INFO", `Using current date (NZ): ${queryDate}`);
     }
 
-    addLog("INFO", `Fetching bookings for Small Tutorial Room on ${queryDate}`);
+    addLog("INFO", `Fetching bookings for ${roomName} on ${queryDate}`);
 
     const response = await axios.get(
-      `${url}/rest/v1/bookings?select=*&order=start_time.asc&date=eq.${queryDate}&room=eq.Small Tutorial Room`,
+      `${url}/rest/v1/bookings?select=*&order=start_time.asc&date=eq.${queryDate}&room=eq.${roomName}`,
       {
         headers: {
           apikey: key,
@@ -226,7 +253,7 @@ export async function fetchBookings(
       );
     }
 
-    addLog("INFO", `Received ${response.data.length} bookings for today`);
+    addLog("INFO", `Received ${response.data.length} bookings for ${roomName} on ${queryDate}`);
 
     // If no data returned, show available slot from now to 23:00
     if (!response.data || response.data.length === 0) {
@@ -240,13 +267,13 @@ export async function fetchBookings(
         date: today,
         start_time: `${String(currentHour).padStart(2, "0")}:00`,
         end_time: "23:00",
-        room: "Small Tutorial Room",
+        room: roomName,
       }];
       addLog(
         "INFO",
         `No bookings found for today, showing available slot from ${String(currentHour).padStart(2, "0")}:00 to 23:00`,
       );
-      return availableBooking;
+      return { room: { name: roomName, id: roomObj.id }, bookings: availableBooking };
     }
 
     // Normalize the response to ensure all required fields are present
@@ -260,11 +287,11 @@ export async function fetchBookings(
         date: booking.date || queryDate,
         start_time: booking.start_time || "00:00",
         end_time: booking.end_time || "23:59",
-        room: booking.room || "Small Tutorial Room",
+        room: booking.room || roomName,
       };
     });
 
-    return normalizedData;
+    return { room: { name: roomName, id: roomObj.id }, bookings: normalizedData };
   } catch (error) {
     if (axios.isAxiosError(error)) {
       addLog(
@@ -274,7 +301,7 @@ export async function fetchBookings(
     } else {
       addLog("ERROR", `Failed to fetch bookings: ${(error as Error).message}`);
     }
-    throw new Error(`Failed to fetch bookings: ${(error as Error).message}`);
+    throw error;
   }
 }
 

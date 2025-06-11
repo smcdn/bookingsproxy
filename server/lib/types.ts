@@ -23,6 +23,7 @@ export interface Log {
 
 // Determine the status of each booking
 export type BookingData = {
+  room: { name: string; id: number | null };
   bookings: any[];
   apiStatus: any;
   logs: any[];

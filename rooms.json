@@ -1,0 +1,15 @@
+{"rooms": [ 
+    {"id": 74, "name": "VCR"},
+    {"id": 75, "name": "TV Room"},
+    {"id": 76, "name": "ACR"},
+    {"id": 77, "name": "Music Room"},
+    {"id": 78, "name": "Atrium"},
+    {"id": 79, "name": "Library"},
+    {"id": 80, "name": "Tennis Court"},
+    {"id": 81, "name": "Study Centre"},
+    {"id": 82, "name": "Small Tutorial Room"},
+    {"id": 83, "name": "Thorpe Tutorial Room"},
+    {"id": 84, "name": "FCR"},
+    {"id": 88, "name": "Conservatory"},
+    {"id": 89, "name": "Dining Hall"}
+]}

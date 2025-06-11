@@ -47,12 +47,12 @@ function roundToQuarterHour(hours: number, minutes: number) {
 }
 
 // Determine the status of each booking
-export async function fetchAndProcessBookings(requestDate?: string): Promise<BookingData> {
+export async function fetchAndProcessBookings(requestDate?: string, roomName?: string, printTable: boolean = false): Promise<BookingData> {
   try {
-    // Fetch bookings from Supabase, passing any requested date
-    const supabaseBookings = await fetchBookings(requestDate);
+    // Fetch bookings from Supabase, passing any requested date and room name
+    const { room, bookings: supabaseBookings } = await fetchBookings(requestDate, roomName);
 
-    addLog("INFO", `Processing ${supabaseBookings.length} bookings from Supabase`);
+    addLog("INFO", `Processing ${supabaseBookings.length} bookings from Supabase for room: ${room.name}`);
 
     // Sort bookings by start time
     supabaseBookings.sort((a, b) => {
@@ -175,33 +175,41 @@ export async function fetchAndProcessBookings(requestDate?: string): Promise<Boo
     // Log the results
     addLog("INFO", `Total processed bookings: ${processedBookings.length}`);
 
-    const statusCounts = {
-      now: processedBookings.filter(b => b.status === "now").length,
-      upcoming: processedBookings.filter(b => b.status === "upcoming").length,
-      next: processedBookings.filter(b => b.status === "next").length,
-      then: processedBookings.filter(b => b.status === "then").length,
-      later: processedBookings.filter(b => b.status === "later").length,
-    };
+    // Count bookings by status and by timePeriod
+    const statusCounts = processedBookings.reduce((acc, b) => {
+      acc[b.status] = (acc[b.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const timePeriodCounts = processedBookings.reduce((acc, b) => {
+      acc[b.timePeriod] = (acc[b.timePeriod] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     const statusString = Object.entries(statusCounts)
-      .filter(([_, count]) => count > 0)
       .map(([status, count]) => `${count} ${status.toUpperCase()}`)
+      .join(", ");
+    const timePeriodString = Object.entries(timePeriodCounts)
+      .map(([period, count]) => `${count} ${period.toUpperCase()}`)
       .join(", ");
 
     addLog("INFO", `Status assignment complete: ${statusString}`);
+    addLog("INFO", `Time periods: ${timePeriodString}`);
     addLog("INFO", "Ready to serve API requests");
+
+    // After processing bookings, optionally print as ASCII table
+    // (ASCII table output not implemented in this version)
 
     // Return the processed bookings with API status and logs
     return {
+      room, // now an object { name, id }
       bookings: processedBookings,
       apiStatus: getApiStatus(),
       logs: getLogs(),
     };
   } catch (error) {
     addLog("ERROR", `Error in fetchAndProcessBookings: ${(error as Error).message}`);
-
-    // Return empty data with error status
     return {
+      room: roomName ? { name: roomName, id: null } : { name: "", id: null },
       bookings: [],
       apiStatus: getApiStatus(),
       logs: getLogs(),
