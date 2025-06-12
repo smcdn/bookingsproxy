@@ -2,6 +2,7 @@
 import { fetchBookings, getApiStatus } from "./supabase";
 import { BookingData } from "../lib/types";
 import { addLog, getLogs } from "../logger";
+import { rooms } from "../rooms";
 
 // Parse the Supabase time format (HH:MM) and return a full date object
 // combining the date from the booking with the time
@@ -45,6 +46,12 @@ function roundToQuarterHour(hours: number, minutes: number) {
     minutes: roundedMinutes,
     timeStr: `${hours.toString().padStart(2, '0')}:${roundedMinutes.toString().padStart(2, '0')}`
   };
+}
+
+// Convert time string (HH:MM) to total minutes
+function timeStrToMinutes(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return hours * 60 + minutes;
 }
 
 // Determine the status of each booking
@@ -154,8 +161,13 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
       isFirstSlot = false;
     }
 
-    // After last booking, if before 23:00, insert available slot
-    if (lastEndTime !== "23:00") {
+    // Get open/close times from room config (default to 07:00/23:00 if not set)
+    const roomConfig = roomName ? rooms[roomName] : undefined;
+    const openTime = roomConfig?.open_time || "07:00";
+    const closeTime = roomConfig?.close_time || "23:00";
+
+    // After last booking, if before closeTime, insert available slot
+    if (lastEndTime !== closeTime) {
       // Determine timePeriod for final available slot
       if (isFirstSlot) {
         timePeriod = "now";
@@ -168,26 +180,26 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
       // Only add minutes_left for the "now" available slot
       let minutes_left: number | undefined = undefined;
       if (timePeriod === "now") {
-        minutes_left = (23 * 60) - nowTotalMinutes;
+        minutes_left = timeStrToMinutes(closeTime) - nowTotalMinutes;
       }
 
       processedBookings.push({
         start_time: lastEndTime,
-        end_time: "23:00",
+        end_time: closeTime,
         status: "available",
         timePeriod,
-        timeRange: `${lastEndTime} - 23:00`,
+        timeRange: `${lastEndTime} - ${closeTime}`,
         ...(minutes_left !== undefined ? { minutes_left } : {})
       });
     }
 
-    // Add closed slot from 23:00 to 07:00
+    // Add closed slot from closeTime to openTime
     processedBookings.push({
-      start_time: "23:00",
-      end_time: "07:00",
+      start_time: closeTime,
+      end_time: openTime,
       status: "closed",
       timePeriod: "later",
-      timeRange: "23:00 - 07:00"
+      timeRange: `${closeTime} - ${openTime}`
     });
 
     // Log the results
