@@ -1,6 +1,7 @@
 //import { Booking, BookingData, SupabaseBooking } from "@/lib/types";
-import { fetchBookings, getApiStatus, getLogs, addLog } from "./supabase";
+import { fetchBookings, getApiStatus } from "./supabase";
 import { BookingData } from "../lib/types";
+import { addLog, getLogs } from "../logger";
 
 // Parse the Supabase time format (HH:MM) and return a full date object
 // combining the date from the booking with the time
@@ -112,12 +113,20 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
         } else {
           timePeriod = "later";
         }
+
+        // Only add minutes_left for the "now" available slot
+        let minutes_left: number | undefined = undefined;
+        if (timePeriod === "now") {
+          minutes_left = bookingStartMinutes - nowTotalMinutes;
+        }
+
         processedBookings.push({
           start_time: lastEndTime,
           end_time: booking.start_time,
           status: "available",
           timePeriod,
-          timeRange: `${lastEndTime} - ${booking.start_time}`
+          timeRange: `${lastEndTime} - ${booking.start_time}`,
+          ...(minutes_left !== undefined ? { minutes_left } : {})
         });
         isFirstSlot = false;
       }
@@ -130,6 +139,7 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
       } else {
         timePeriod = "later";
       }
+
       processedBookings.push({
         name: booking.name,
         creator: booking.creator,
@@ -154,12 +164,20 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
       } else {
         timePeriod = "later";
       }
+
+      // Only add minutes_left for the "now" available slot
+      let minutes_left: number | undefined = undefined;
+      if (timePeriod === "now") {
+        minutes_left = (23 * 60) - nowTotalMinutes;
+      }
+
       processedBookings.push({
         start_time: lastEndTime,
         end_time: "23:00",
         status: "available",
         timePeriod,
-        timeRange: `${lastEndTime} - 23:00`
+        timeRange: `${lastEndTime} - 23:00`,
+        ...(minutes_left !== undefined ? { minutes_left } : {})
       });
     }
 

@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { addLog } from "./api/supabase";
+import { addLog } from "./logger";
 
 // Logging utility function moved from vite.ts
 function log(message: string, source = "express") {

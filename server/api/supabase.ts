@@ -1,10 +1,8 @@
 import axios from "axios";
-import { SupabaseAuthResponse, SupabaseBooking, Log } from "../lib/types";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { SupabaseAuthResponse, SupabaseBooking } from "../lib/types";
+import { config } from "../config";
+import { addLog, getLogs } from "../logger";
+import { rooms, validRoomNames } from "../rooms";
 
 // Cache for the supabase token
 let tokenCache: {
@@ -13,45 +11,7 @@ let tokenCache: {
   refresh_token: string;
 } | null = null;
 
-const logs: Log[] = [];
-
-// Helper to log messages
-export function addLog(
-  level: "INFO" | "ERROR" | "WARN",
-  message: string,
-): void {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const hours = now.getHours().toString().padStart(2, "0");
-  const minutes = now.getMinutes().toString().padStart(2, "0");
-  const seconds = now.getSeconds().toString().padStart(2, "0");
-
-  const timestamp = `${date} ${hours}:${minutes}:${seconds}`;
-
-  logs.push({
-    timestamp,
-    level,
-    message,
-  });
-
-  // Keep logs limited to last 100 entries
-  if (logs.length > 100) {
-    logs.shift();
-  }
-
-  // Also log to console for debugging
-  console.log(`[${level}] ${timestamp}: ${message}`);
-}
-
-// Get all logs
-export function getLogs(): Log[] {
-  return [...logs];
-}
-
 // Get Supabase URL and API key from environment variables
-import { config } from "../config";
-//import { url } from "inspector";
-
 const getSupabaseConfig = () => {
   return {
     url: config.supabase.url,
@@ -59,7 +19,6 @@ const getSupabaseConfig = () => {
     email: config.supabase.email,
     password: config.supabase.password,
   };
-
 };
 
 // Authenticate with Supabase and get a token
@@ -181,17 +140,6 @@ function formatDateForQuery(date: Date): string {
   }
 }
 
-// Use absolute path for rooms.json
-const roomsPath = path.resolve(__dirname, "../../rooms.json");
-let roomsData: { rooms: { id: number; name: string }[] };
-try {
-  roomsData = JSON.parse(fs.readFileSync(roomsPath, "utf-8"));
-} catch (e) {
-  addLog("ERROR", `Failed to load rooms.json: ${(e as Error).message}`);
-  roomsData = { rooms: [] };
-}
-const validRoomNames = roomsData.rooms.map((room: any) => room.name);
-
 // Fetch bookings from Supabase
 export async function fetchBookings(
   requestDate?: string,
@@ -202,7 +150,7 @@ export async function fetchBookings(
       addLog("ERROR", "Missing required header: room_name");
       throw new Error("Missing required header: room_name");
     }
-    const roomObj = roomsData.rooms.find((room: any) => room.name === roomName);
+    const roomObj = rooms[roomName];
     if (!roomObj) {
       addLog("WARN", `Invalid room_name requested: ${roomName}`);
       throw new Error(`Invalid room_name: ${roomName}`);

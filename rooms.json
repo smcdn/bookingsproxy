@@ -1,15 +1,72 @@
-{"rooms": [ 
-    {"id": 74, "name": "VCR"},
-    {"id": 75, "name": "TV Room"},
-    {"id": 76, "name": "ACR"},
-    {"id": 77, "name": "Music Room"},
-    {"id": 78, "name": "Atrium"},
-    {"id": 79, "name": "Library"},
-    {"id": 80, "name": "Tennis Court"},
-    {"id": 81, "name": "Study Centre"},
-    {"id": 82, "name": "Small Tutorial Room"},
-    {"id": 83, "name": "Thorpe Tutorial Room"},
-    {"id": 84, "name": "FCR"},
-    {"id": 88, "name": "Conservatory"},
-    {"id": 89, "name": "Dining Hall"}
-]}
+{
+  "rooms": {
+    "VCR": {
+      "id": 74,
+      "restricted_hours": false
+    },
+    "TV Room": {
+      "id": 75,
+      "restricted_hours": false
+    },
+    "ACR": {
+      "id": 76,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Music Room": {
+      "id": 77,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Atrium": {
+      "id": 78,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Library": {
+      "id": 79,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Tennis Court": {
+      "id": 80,
+      "restricted_hours": false
+    },
+    "Study Centre": {
+      "id": 81,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Small Tutorial Room": {
+      "id": 82,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Thorpe Tutorial Room": {
+      "id": 83,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "FCR": {
+      "id": 84,
+      "restricted_hours": true,
+      "open_time": "07:00",
+      "close_time": "23:00"
+    },
+    "Conservatory": {
+      "id": 88,
+      "restricted_hours": false
+    },
+    "Dining Hall": {
+      "id": 89,
+      "restricted_hours": false
+    }
+  }
+}
