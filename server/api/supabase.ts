@@ -204,25 +204,25 @@ export async function fetchBookings(
     addLog("INFO", `Received ${response.data.length} bookings for ${roomName} on ${queryDate}`);
 
     // If no data returned, show available slot from now to 23:00
-    if (!response.data || response.data.length === 0) {
-      const now = new Date();
-      const currentHour = now.getHours();
-      const today = queryDate;
-      const availableBooking = [{
-        uid: "available-slot",
-        name: "Available",
-        creator: "System",
-        date: today,
-        start_time: `${String(currentHour).padStart(2, "0")}:00`,
-        end_time: "23:00",
-        room: roomName,
-      }];
-      addLog(
-        "INFO",
-        `No bookings found for today, showing available slot from ${String(currentHour).padStart(2, "0")}:00 to 23:00`,
-      );
-      return { room: { name: roomName, id: roomObj.id }, bookings: availableBooking };
-    }
+    // if (!response.data || response.data.length === 0) {
+    //   const now = new Date();
+    //   const currentHour = now.getHours();
+    //   const today = queryDate;
+    //   const availableBooking = [{
+    //     uid: "available-slot",
+    //     name: "Available",
+    //     creator: "System",
+    //     date: today,
+    //     start_time: `${String(currentHour).padStart(2, "0")}:00`,
+    //     end_time: "23:00",
+    //     room: roomName,
+    //   }];
+    //   addLog(
+    //     "INFO",
+    //     `No bookings found for today, showing available slot from ${String(currentHour).padStart(2, "0")}:00 to 23:00`,
+    //   );
+    //   return { room: { name: roomName, id: roomObj.id }, bookings: availableBooking };
+    // }
 
     // Normalize the response to ensure all required fields are present
     const normalizedData = response.data.map((booking: any) => {

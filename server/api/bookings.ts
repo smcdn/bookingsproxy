@@ -138,15 +138,7 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
         isFirstSlot = false;
       }
 
-      // Determine timePeriod for booking
-      if (isFirstSlot) {
-        timePeriod = "now";
-      } else if (timePeriod === "now") {
-        timePeriod = "upcoming";
-      } else {
-        timePeriod = "later";
-      }
-
+      // Only push real bookings as 'booked'
       processedBookings.push({
         name: booking.name,
         creator: booking.creator,
@@ -161,46 +153,95 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
       isFirstSlot = false;
     }
 
-    // Get open/close times from room config (default to 07:00/23:00 if not set)
+    // Get open/close times and restriction from room config
     const roomConfig = roomName ? rooms[roomName] : undefined;
+    const restricted = roomConfig?.restricted_hours;
     const openTime = roomConfig?.open_time || "07:00";
     const closeTime = roomConfig?.close_time || "23:00";
+    const bookable = roomConfig?.bookable ?? false;
 
-    // After last booking, if before closeTime, insert available slot
-    if (lastEndTime !== closeTime) {
-      // Determine timePeriod for final available slot
-      if (isFirstSlot) {
-        timePeriod = "now";
-      } else if (timePeriod === "now") {
-        timePeriod = "upcoming";
+    // If there are no bookings for the day
+    if (futureBookings.length === 0) {
+      if (restricted) {
+        // Available from openTime to closeTime
+        processedBookings.push({
+          start_time: openTime,
+          end_time: closeTime,
+          status: "available",
+          timePeriod: "now",
+          timeRange: `${openTime} - ${closeTime}`
+        });
+        // Room is closed from closeTime to openTime
+        processedBookings.push({
+          start_time: closeTime,
+          end_time: openTime,
+          status: "closed",
+          timePeriod: "later",
+          timeRange: `${closeTime} - ${openTime}`
+        });
       } else {
-        timePeriod = "later";
+        // Not restricted: available all day
+        processedBookings.push({
+          start_time: "00:00",
+          end_time: "24:00",
+          status: "available",
+          timePeriod: "now",
+          timeRange: "00:00 - 24:00"
+        });
       }
-
-      // Only add minutes_left for the "now" available slot
-      let minutes_left: number | undefined = undefined;
-      if (timePeriod === "now") {
-        minutes_left = timeStrToMinutes(closeTime) - nowTotalMinutes;
-      }
-
-      processedBookings.push({
-        start_time: lastEndTime,
-        end_time: closeTime,
-        status: "available",
-        timePeriod,
-        timeRange: `${lastEndTime} - ${closeTime}`,
-        ...(minutes_left !== undefined ? { minutes_left } : {})
-      });
+      addLog("INFO", `No bookings for the day. Returning default slots for room: ${roomName}`);
+      return {
+        room: { ...room, bookable },
+        bookings: processedBookings,
+        apiStatus: getApiStatus(),
+        logs: getLogs(),
+      };
     }
 
-    // Add closed slot from closeTime to openTime
-    processedBookings.push({
-      start_time: closeTime,
-      end_time: openTime,
-      status: "closed",
-      timePeriod: "later",
-      timeRange: `${closeTime} - ${openTime}`
-    });
+    // After last booking, handle available/closed slots based on restriction
+    if (restricted) {
+      if (lastEndTime !== closeTime) {
+        // Determine timePeriod for final available slot
+        if (isFirstSlot) {
+          timePeriod = "now";
+        } else if (timePeriod === "now") {
+          timePeriod = "upcoming";
+        } else {
+          timePeriod = "later";
+        }
+        let minutes_left: number | undefined = undefined;
+        if (timePeriod === "now") {
+          minutes_left = timeStrToMinutes(closeTime) - nowTotalMinutes;
+        }
+        processedBookings.push({
+          start_time: lastEndTime,
+          end_time: closeTime,
+          status: "available",
+          timePeriod,
+          timeRange: `${lastEndTime} - ${closeTime}`,
+          ...(minutes_left !== undefined ? { minutes_left } : {})
+        });
+      }
+      // Add closed slot from closeTime to openTime
+      processedBookings.push({
+        start_time: closeTime,
+        end_time: openTime,
+        status: "closed",
+        timePeriod: "later",
+        timeRange: `${closeTime} - ${openTime}`
+      });
+    } else {
+      // Not restricted: available from last booking to midnight
+      if (lastEndTime !== "24:00") {
+        processedBookings.push({
+          start_time: lastEndTime,
+          end_time: "24:00",
+          status: "available",
+          timePeriod: "later",
+          timeRange: `${lastEndTime} - 24:00`
+        });
+      }
+    }
 
     // Log the results
     addLog("INFO", `Total processed bookings: ${processedBookings.length}`);
@@ -231,7 +272,7 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
 
     // Return the processed bookings with API status and logs
     return {
-      room, // now an object { name, id }
+      room: { name: room.name, id: room.id, bookable },
       bookings: processedBookings,
       apiStatus: getApiStatus(),
       logs: getLogs(),

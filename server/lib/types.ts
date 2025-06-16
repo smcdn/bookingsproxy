@@ -22,9 +22,13 @@ export interface Log {
 }
 
 // Determine the status of each booking
-export type BookingData = {
-  room: { name: string; id: number | null };
+export interface BookingData {
+  room: {
+    name: string;
+    id: number | null;
+    bookable?: boolean;
+  };
   bookings: any[];
   apiStatus: any;
-  logs: any[];
-};
+  logs: any;
+}

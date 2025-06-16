@@ -2,71 +2,84 @@
   "rooms": {
     "VCR": {
       "id": 74,
-      "restricted_hours": false
+      "restricted_hours": false,
+      "bookable": false
     },
     "TV Room": {
       "id": 75,
-      "restricted_hours": false
+      "restricted_hours": false,
+      "bookable": true
     },
     "ACR": {
       "id": 76,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": false
     },
     "Music Room": {
       "id": 77,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": true
     },
     "Atrium": {
       "id": 78,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": false
     },
     "Library": {
       "id": 79,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": false
     },
     "Tennis Court": {
       "id": 80,
-      "restricted_hours": false
+      "restricted_hours": false,
+      "bookable": false
     },
     "Study Centre": {
       "id": 81,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": false
     },
     "Small Tutorial Room": {
       "id": 82,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": true
     },
     "Thorpe Tutorial Room": {
       "id": 83,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": true
     },
     "FCR": {
       "id": 84,
       "restricted_hours": true,
       "open_time": "07:00",
-      "close_time": "23:00"
+      "close_time": "23:00",
+      "bookable": false
     },
     "Conservatory": {
       "id": 88,
-      "restricted_hours": false
+      "restricted_hours": false,
+      "bookable": false
     },
     "Dining Hall": {
       "id": 89,
-      "restricted_hours": false
+      "restricted_hours": false,
+      "bookable": false
     }
   }
 }
