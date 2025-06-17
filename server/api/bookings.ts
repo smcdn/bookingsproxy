@@ -103,6 +103,8 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
     let lastEndTime = roundedNow.timeStr;
     let timePeriod: "now" | "upcoming" | "later" = "now";
     let isFirstSlot = true;
+    let foundNow = false;
+    let foundUpcoming = false;
 
     for (const booking of futureBookings) {
       const [startHours, startMinutes] = booking.start_time.split(":").map(Number);
@@ -112,40 +114,46 @@ export async function fetchAndProcessBookings(requestDate?: string, roomName?: s
 
       // Insert available slot if there's a gap
       if (bookingStartMinutes > lastEndMinutes) {
-        // Determine timePeriod for available slot
-        if (isFirstSlot) {
-          timePeriod = "now";
-        } else if (timePeriod === "now") {
-          timePeriod = "upcoming";
-        } else {
-          timePeriod = "later";
+        // Assign timePeriod for available slot
+        let slotTimePeriod: "now" | "upcoming" | "later" = "later";
+        if (!foundNow && nowTotalMinutes >= lastEndMinutes && nowTotalMinutes < bookingStartMinutes) {
+          slotTimePeriod = "now";
+          foundNow = true;
+        } else if (!foundUpcoming && foundNow) {
+          slotTimePeriod = "upcoming";
+          foundUpcoming = true;
         }
-
-        // Only add minutes_left for the "now" available slot
         let minutes_left: number | undefined = undefined;
-        if (timePeriod === "now") {
+        if (slotTimePeriod === "now") {
           minutes_left = bookingStartMinutes - nowTotalMinutes;
         }
-
         processedBookings.push({
           start_time: lastEndTime,
           end_time: booking.start_time,
           status: "available",
-          timePeriod,
+          timePeriod: slotTimePeriod,
           timeRange: `${lastEndTime} - ${booking.start_time}`,
           ...(minutes_left !== undefined ? { minutes_left } : {})
         });
         isFirstSlot = false;
       }
 
-      // Only push real bookings as 'booked'
+      // Assign timePeriod for booking
+      let bookingTimePeriod: "now" | "upcoming" | "later" = "later";
+      if (!foundNow && nowTotalMinutes >= bookingStartMinutes && nowTotalMinutes < bookingEndMinutes) {
+        bookingTimePeriod = "now";
+        foundNow = true;
+      } else if (!foundUpcoming && foundNow) {
+        bookingTimePeriod = "upcoming";
+        foundUpcoming = true;
+      }
       processedBookings.push({
         name: booking.name,
         creator: booking.creator,
         start_time: booking.start_time,
         end_time: booking.end_time,
         status: "booked",
-        timePeriod,
+        timePeriod: bookingTimePeriod,
         timeRange: `${booking.start_time} - ${booking.end_time}`
       });
       lastEndMinutes = bookingEndMinutes;
