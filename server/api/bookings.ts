@@ -2,6 +2,22 @@
 import { fetchBookings, getApiStatus } from "./supabase";
 import { BookingData } from "../lib/types";
 import { addLog, getLogs } from "../logger";
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// Use import.meta.url to get directory in ES module scope
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Move rooms.json to data/ subdirectory
+const roomsPath = path.join(process.cwd(), 'data', 'rooms.json');
+// Check for presence of rooms.json at startup
+if (!fs.existsSync(roomsPath)) {
+  console.error(`rooms.json not found at ${roomsPath}. Please ensure the file exists.`);
+  process.exit(1);
+}
+
+// Update import for rooms
 import { rooms } from "../rooms";
 
 // Parse the Supabase time format (HH:MM) and return a full date object
