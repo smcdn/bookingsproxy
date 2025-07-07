@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { addLog } from "./logger";
+import { startNgrok } from "./ngrok";
 
 // Logging utility function moved from vite.ts
 function log(message: string, source = "express") {
@@ -90,10 +91,11 @@ import { config } from './config';
     });
 
     // Use port and host from config
-    server.listen(config.port, config.host, () => {
+    server.listen(config.port, config.host, async () => {
       const startupMessage = `Room Bookings API Server running on port ${config.port}`;
       console.log(startupMessage);
       addLog("INFO", startupMessage);
+      await startNgrok(config.port);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
